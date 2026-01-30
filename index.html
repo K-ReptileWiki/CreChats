@@ -1374,65 +1374,60 @@
         }
 
         // ========== 방 생성 ==========
-        async function createRoom() {
-            const username = usernameInput.value.trim();
-            const roomName = roomNameInput.value.trim();
-            const password = roomPasswordInput.value.trim();
+  async function createRoom() {
+    const username = usernameInput.value.trim();
+    const roomName = roomNameInput.value.trim();
+    const password = roomPasswordInput.value.trim();
 
-            if (!username) {
-                alert('닉네임을 입력하세요');
-                return;
-            }
+    if (!username || !roomName) {
+        alert('닉네임과 방 이름을 입력하세요');
+        return;
+    }
 
-            if (!roomName) {
-                alert('방 이름을 입력하세요');
-                return;
-            }
+    try {
+        const roomId = generateRoomId();
+        const userId = generateUserId();
 
-            if (password && (password.length !== 6 || !/^\d+$/.test(password))) {
-                alert('비밀번호는 6자리 숫자여야 합니다');
-                return;
-            }
+        // [체크] 방 생성 시도
+        const { data, error: roomError } = await supabase
+            .from('rooms')
+            .insert({
+                id: roomId,
+                name: roomName,
+                password: password || null,
+                owner_id: userId
+            });
 
-            try {
-                const roomId = generateRoomId();
-                const userId = generateUserId();
-
-                const { error: roomError } = await supabase
-                    .from('rooms')
-                    .insert({
-                        id: roomId,
-                        name: roomName,
-                        password: password || null,
-                        owner_id: userId,
-                        created_at: new Date().toISOString()
-                    });
-
-                if (roomError) throw roomError;
-
-                const { error: userError } = await supabase
-                    .from('participants')
-                    .insert({
-                        room_id: roomId,
-                        user_id: userId,
-                        username: username,
-                        role: 'owner',
-                        joined_at: new Date().toISOString()
-                    });
-
-                if (userError) throw userError;
-
-                await sendSystemMessage(roomId, `${username}님이 채팅방을 만들었습니다`);
-
-                currentUser = { id: userId, username, role: 'owner' };
-                currentRoom = roomId;
-                
-                enterChatRoom();
-            } catch (error) {
-                console.error('Error creating room:', error);
-                alert('방 생성 중 오류가 발생했습니다');
-            }
+        if (roomError) {
+            alert('방 테이블 생성 에러: ' + roomError.message);
+            return;
         }
+
+        // [체크] 참가자 추가 시도
+        const { error: userError } = await supabase
+            .from('participants')
+            .insert({
+                room_id: roomId,
+                user_id: userId,
+                username: username,
+                role: 'owner'
+            });
+
+        if (userError) {
+            alert('참가자 설정 에러: ' + userError.message);
+            return;
+        }
+
+        currentUser = { id: userId, username, role: 'owner' };
+        currentRoom = roomId;
+
+        enterChatRoom();
+        alert('방 생성 성공!'); 
+    } catch (error) {
+        alert('알 수 없는 오류: ' + error.message);
+    }
+}
+
 
         // ========== 방 입장 ==========
         async function joinRoom() {
